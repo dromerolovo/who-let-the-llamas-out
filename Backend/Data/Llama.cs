@@ -11,5 +11,16 @@
         public SimpleCoordinate? RouteDestination { get; set; }
         public double Bearing { get; set; }
         public SimpleCoordinate? MovementPerSecond { get; set; }
+
+        public LlamaDto ToDto()
+        {
+            return new LlamaDto
+            {
+                Id = this.Id,
+                Bearing = this.Bearing,
+                CurrentPosition = this.CurrentPosition,
+                MovementPerSecond = this.MovementPerSecond
+            };
+        }
     }
 }

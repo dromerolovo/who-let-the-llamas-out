@@ -24,7 +24,7 @@ namespace Backend
             _llamasOptions = llamasOptions.Value;
             _hubContext = hubContext;
         }
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             InitializeObjects();
             throw new NotImplementedException();
@@ -40,6 +40,17 @@ namespace Backend
                 };
                 _llamas.TryAdd(i, @object);
             }
+        }
+
+        private async Task BroadcastLlamasPosition()
+        {
+            var dtos = _llamas.Values.Select(v => new LlamaDto
+            {
+                Id = v.Id,
+                CurrentPosition = v.CurrentPosition,
+                Bearing = v.Bearing,
+                MovementPerSecond = v.MovementPerSecond
+            }).ToList();
         }
 
         private async Task UpdateLlamasPositions()
