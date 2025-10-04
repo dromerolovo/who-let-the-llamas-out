@@ -7,4 +7,9 @@
     <UserSecretsId>207ebf71-1cba-41b5-8eff-91e5fcd2b435</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="NetTopologySuite" Version="2.6.0" />
+    <PackageReference Include="ProjNET" Version="2.1.0" />
+  </ItemGroup>
+
 </Project>

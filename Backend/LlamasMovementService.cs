@@ -7,6 +7,7 @@ using NetTopologySuite.IO;
 using ProjNet.CoordinateSystems;
 using ProjNet.CoordinateSystems.Transformations;
 using System.Collections.Concurrent;
+using System.Text.Json;
 
 namespace Backend
 {
@@ -30,8 +31,14 @@ namespace Backend
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            InitializeObjects();
-            throw new NotImplementedException();
+            while(!stoppingToken.IsCancellationRequested)
+            {
+                InitializeObjects();
+                await UpdateLlamasPositions();
+                await BroadcastLlamasPosition();
+                await Task.Delay(_llamasOptions.UpdateIntervalMs, stoppingToken);
+            }
+
         }
 
         private void InitializeObjects()
@@ -55,12 +62,80 @@ namespace Backend
                 Bearing = v.Bearing,
                 MovementPerSecond = v.MovementPerSecond
             }).ToList();
+
+            await Task.CompletedTask;
+
+            Console.WriteLine(JsonSerializer.Serialize(dtos));
         }
 
         private async Task UpdateLlamasPositions()
         {
             var llamasNeedingUpdate = _llamas.Values.Where(llm => llm.NeedsNewRoute).ToList();
 
+            if(llamasNeedingUpdate.Any())
+            {
+                var routeTasks = llamasNeedingUpdate.Select(async llm =>
+                {
+                    var pointOrigin = llm.PreviousPosition ?? GetRandomPoint();
+                    var pointDestination = GetRandomPoint();
+                    var newRoute = await _mapboxDirectionService.GetWalkingRoute(pointOrigin, pointDestination);
+
+                    llm.CurrentPosition = pointOrigin;
+                    llm.CurrentRoute = newRoute;
+                    llm.NeedsNewRoute = false;
+                    llm.RouteDestination = newRoute.Last();
+                    llm.CurrentRouteIndex = 0;
+                });
+
+                await Task.WhenAll(routeTasks);
+            }
+
+            foreach (var llm in _llamas.Values)
+            {
+                if (llm.CurrentRoute == null)
+                {
+                    llm.NeedsNewRoute = true;
+                    continue;
+                }
+
+                llm.PreviousPosition = llm.CurrentPosition;
+
+                var target = llm.CurrentRoute[llm.CurrentRouteIndex];
+                var distanceMeters = CalculateDistance(llm.CurrentPosition, target);
+
+                if (distanceMeters <= _llamasOptions.ObjectsSpeed)
+                {
+                    llm.CurrentPosition = target;
+                    llm.CurrentRouteIndex++;
+
+
+                    if (llm.CurrentRouteIndex >= llm.CurrentRoute.Count)
+                    {
+                        llm.NeedsNewRoute = true;
+                    }
+                }
+                else
+                {
+                    llm.CurrentPosition = MoveTowardsInMeters(llm.CurrentPosition, target);
+                }
+
+                llm.Bearing = CalculateBearing(llm.PreviousPosition, llm.CurrentPosition);
+                llm.MovementPerSecond = CalculateMovementPerSecond(llm.PreviousPosition, llm.CurrentPosition);
+            }
+
+        }
+
+        private SimpleCoordinate MoveTowardsInMeters(SimpleCoordinate currentPosition, SimpleCoordinate target)
+        {
+            var distance = CalculateDistance(currentPosition, target);
+            if (distance <= 0) return currentPosition;
+
+            var ratio = _llamasOptions.ObjectsSpeed / distance;
+
+            var newX = currentPosition.X + (target.X - currentPosition.X) * ratio;
+            var newY = currentPosition.Y + (target.Y - currentPosition.Y) * ratio;
+
+            return new SimpleCoordinate(newX, newY);
         }
 
         private SimpleCoordinate GetRandomPoint()

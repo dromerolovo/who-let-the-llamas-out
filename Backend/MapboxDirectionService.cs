@@ -14,6 +14,12 @@ namespace Backend
     public class MockMapboxDirectionService : IMapboxDirectionService
     {
         private readonly Random _random = new Random();
+
+        public MockMapboxDirectionService(HttpClient httpClient)
+        {
+
+        }
+
         public Task<List<SimpleCoordinate>> GetWalkingRoute(SimpleCoordinate start, SimpleCoordinate end)
         {
             int intermediateCount = _random.Next(6, 15);
