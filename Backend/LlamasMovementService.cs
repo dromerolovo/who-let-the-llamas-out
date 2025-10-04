@@ -2,6 +2,10 @@
 using Backend.Data;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
+using NetTopologySuite.Geometries;
+using NetTopologySuite.IO;
+using ProjNet.CoordinateSystems;
+using ProjNet.CoordinateSystems.Transformations;
 using System.Collections.Concurrent;
 
 namespace Backend
@@ -55,8 +59,99 @@ namespace Backend
 
         private async Task UpdateLlamasPositions()
         {
-            var llamasNeedingUpdate = _llamas.Values.Where(o => o.NeedsNewRoute).ToList();
+            var llamasNeedingUpdate = _llamas.Values.Where(llm => llm.NeedsNewRoute).ToList();
 
+        }
+
+        private SimpleCoordinate GetRandomPoint()
+        {
+            var polygon = GetBoundaries();
+            var random = new Random();
+            var envelope = polygon.EnvelopeInternal;
+            while (true)
+            {
+                double randomX = envelope.MinX + random.NextDouble() * (envelope.MaxX - envelope.MinX);
+                double randomY = envelope.MinY + random.NextDouble() * (envelope.MaxY - envelope.MinY);
+                var point = new Point(randomX, randomY);
+                if (polygon.Contains(point))
+                {
+                    return new SimpleCoordinate(randomX, randomY);
+                }
+            }
+        }
+
+        private Polygon GetBoundaries()
+        {
+            WKTReader wktReader = new WKTReader();
+
+            var wkt = _llamasOptions.Boundary;
+
+            Geometry geometry = wktReader.Read(wkt);
+
+            if (geometry is Polygon polygon)
+            {
+                return polygon;
+            }
+            else
+            {
+                throw new Exception("Boundary WKT is not a valid Polygon.");
+            }
+        }
+
+        private double CalculateDistance(SimpleCoordinate origin, SimpleCoordinate destination)
+        {
+            var gf = new GeometryFactory(new PrecisionModel(), 4326);
+            var point1 = gf.CreatePoint(origin.ToNTS());
+            var point2 = gf.CreatePoint(destination.ToNTS());
+
+            var wgs84 = GeographicCoordinateSystem.WGS84;
+            var webMercator = ProjectedCoordinateSystem.WebMercator;
+
+            var ctFactory = new CoordinateTransformationFactory();
+            var transform = ctFactory.CreateFromCoordinateSystems(wgs84, webMercator);
+
+            var mercatorOrigin = transform.MathTransform.Transform(new double[] { point1.X, point1.Y });
+            var mercatorDestination = transform.MathTransform.Transform(new double[] { point2.X, point2.Y });
+
+
+            var webMercatorFactory = new GeometryFactory(new PrecisionModel(), 3857);
+            var point1Meters = webMercatorFactory.CreatePoint(new Coordinate(mercatorOrigin[0], mercatorOrigin[1]));
+            var point2Meters = webMercatorFactory.CreatePoint(new Coordinate(mercatorDestination[0], mercatorDestination[1]));
+
+            double distanceMeters = point1Meters.Distance(point2Meters);
+            return distanceMeters;
+        }
+
+        private double CalculateBearing(SimpleCoordinate from, SimpleCoordinate to)
+        {
+            var lat1 = DegreesToRadians(from.Y);
+            var lat2 = DegreesToRadians(to.Y);
+            var dLon = DegreesToRadians(to.X - from.X);
+
+            var y = Math.Sin(dLon) * Math.Cos(lat2);
+            var x = Math.Cos(lat1) * Math.Sin(lat2) -
+                    Math.Sin(lat1) * Math.Cos(lat2) * Math.Cos(dLon);
+
+            var bearingRadians = Math.Atan2(y, x);
+
+            var bearingDegrees = RadiansToDegrees(bearingRadians);
+
+            return (bearingDegrees + 360) % 360;
+        }
+
+        private SimpleCoordinate CalculateMovementPerSecond(SimpleCoordinate origin, SimpleCoordinate dest)
+        {
+            return new SimpleCoordinate(dest.X - origin.X, dest.Y - origin.Y);
+        }
+
+        private double RadiansToDegrees(double radians)
+        {
+            return radians * 180.0 / Math.PI;
+        }
+
+        private double DegreesToRadians(double degrees)
+        {
+            return degrees * Math.PI / 180.0;
         }
     }
 }
