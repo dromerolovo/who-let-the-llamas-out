@@ -63,7 +63,7 @@ namespace Backend
                 MovementPerSecond = v.MovementPerSecond
             }).ToList();
 
-            await Task.CompletedTask;
+            await _hubContext.Clients.All.SendAsync("LlamasPositions", _llamas.Values.ToList());
 
             Console.WriteLine(JsonSerializer.Serialize(dtos));
         }

@@ -59,4 +59,5 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation(libs.mapbox.ndk27)
     implementation(libs.mapbox.compose)
+    implementation(libs.signalr)
 }
