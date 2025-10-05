@@ -49,10 +49,12 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.llamas.data.InterpolatedLlama
 import com.llamas.managers.LocationManager
 import com.llamas.ui.theme.LlamasTheme
+import com.llamas.viewmodels.GeminiViewModel
 import com.llamas.viewmodels.LlamasHandlerViewModel
 import com.llamas.viewmodels.LocationViewModel
 import com.llamas.viewmodels.SignalRViewModel
@@ -94,6 +96,7 @@ class MainActivity : ComponentActivity() {
             val signalRViewModel = remember { SignalRViewModel() }
             val llamasHandlerViewModel = remember { LlamasHandlerViewModel() }
             val locationViewModel = remember { LocationViewModel() }
+            val geminiViewModel = remember { GeminiViewModel(getString(R.string.gemini_token)) }
 
             val llamasUpdates = signalRViewModel.llamasUpdates.collectAsState()
 
@@ -137,7 +140,7 @@ class MainActivity : ComponentActivity() {
 
                         )
                     }) { innerPadding ->
-                    MainEntryPoint(innerPadding, signalRViewModel, llamasHandlerViewModel, locationViewModel)
+                    MainEntryPoint(innerPadding, signalRViewModel, llamasHandlerViewModel, locationViewModel, geminiViewModel)
                 }
             }
         }
@@ -150,7 +153,8 @@ fun MainEntryPoint
         innerPadding : PaddingValues,
         signalRViewModel: SignalRViewModel,
         llamasHandlerViewModel: LlamasHandlerViewModel,
-        locationViewModel: LocationViewModel
+        locationViewModel: LocationViewModel,
+        geminiViewModel: GeminiViewModel,
     ) {
 
     val context = LocalContext.current
@@ -171,6 +175,7 @@ fun MainEntryPoint
     var llamaIdCaptured by remember { mutableStateOf<Int?>(null)}
 
     var showDialogGameStats by remember { mutableStateOf(false) }
+    val aiResponse by geminiViewModel.aiResponse.collectAsState()
 
     if(showDialog) {
         Dialog(onDismissRequest = { showDialog = false }) {
@@ -184,7 +189,7 @@ fun MainEntryPoint
                     Text("Llama #${selectedId?.plus(1)}", fontWeight = FontWeight.Bold)
                     Image(painter = painterResource(id = R.drawable.llama_smoking), contentDescription = "Llama")
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("You can design any content here.")
+                    Text(aiResponse ?: "I'm thinking...", fontSize = 14.sp, textAlign = TextAlign.Center)
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = {
                         signalRViewModel.captureLLama(selectedId!!)
@@ -194,8 +199,9 @@ fun MainEntryPoint
                     }) {
                         Text("Capture")
                     }
-                    Button(onClick = { showDialog = false }) {
+                    Button(onClick = { geminiViewModel.generateContent(interpolatedLlamas.values.map { it.currentPosition }) }) {
                         Text("Ask for a hint")
+
                     }
                     Button(onClick = { showDialog = false }) {
                         Text("Close")
@@ -377,6 +383,7 @@ fun MainEntryPoint
                         showDialog = true
                         selectedId = id
                         Log.d("MapClick", "Selected llama with ID: $id")
+                        geminiViewModel.generateContent(point)
                     }
                 }
                 true
