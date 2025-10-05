@@ -206,7 +206,7 @@ fun MainEntryPoint
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Llama #${selectedId?.plus(1)}", fontWeight = FontWeight.Bold)
-                    Image(painter = painterResource(id = R.drawable.llama_smoking), contentDescription = "Llama")
+                    Image(painter = painterResource(id = R.drawable.llama_cynic), contentDescription = "Llama")
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(aiResponse ?: "I'm thinking...", fontSize = 14.sp, textAlign = TextAlign.Center)
                     Spacer(modifier = Modifier.height(16.dp))
@@ -219,7 +219,7 @@ fun MainEntryPoint
                         Text("Capture")
                     }
                     Button(onClick = { geminiViewModel.generateContent(interpolatedLlamas.values.map { it.currentPosition }) }) {
-                        Text("Ask for a hint")
+                        Text("Ask for a clue")
 
                     }
                     Button(onClick = { showDialog = false }) {

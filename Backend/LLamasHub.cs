@@ -38,5 +38,10 @@ namespace Backend
             var totalLlamas = _appState.Llamas.Count;
             await Clients.Caller.SendAsync("OnGameStats", llamasCapturedByUser, totalLlamasCaptured, totalLlamas);
         }
+
+        public async Task BroadcastMessage(string message)
+        {
+            await Clients.All.SendAsync("ReceiveMessage", message);
+        }
     }
 }
