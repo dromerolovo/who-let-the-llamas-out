@@ -3,6 +3,7 @@ package com.llamas.viewmodels
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.llamas.data.GameStats
 import com.llamas.data.LlamaDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,8 +27,23 @@ class SignalRViewModel : ViewModel() {
     private val _userId = MutableStateFlow<Int?>(null)
     val userId: StateFlow<Int?> = _userId.asStateFlow()
 
+    private val _gameStats = MutableStateFlow<GameStats?>(null)
+    val gameStats: StateFlow<GameStats?> = _gameStats.asStateFlow()
+
     init {
         setupSignalR()
+    }
+
+    fun getGameStats(userId: Int) {
+        viewModelScope.launch {
+            try {
+                Log.d("SignalRGameStats", "Sending GetGameStats request")
+                withContext(Dispatchers.IO) {
+                    hubConnection.send("GetGameStats", userId)
+                }
+            } catch (e: Exception) {
+            }
+        }
     }
 
     fun captureLLama(llamaId: Int) {
@@ -49,6 +65,12 @@ class SignalRViewModel : ViewModel() {
             _userId.value = userId
 
         }, Int::class.java)
+
+        hubConnection.on("OnGameStats", { llamasCapturedByUser : Int, totalLlamasCaptured : Int, totalLlamas : Int ->
+            val gameStats = GameStats(totalLlamas, llamasCapturedByUser, totalLlamasCaptured )
+            Log.d("SignalRGameStats", "GameStats: $gameStats")
+            _gameStats.value = gameStats
+        }, Int::class.java, Int::class.java, Int::class.java)
 
         hubConnection.on("LlamasPositions", { llamas ->
             Log.d("SignalR", "Received Llamas: ${llamas.contentToString()}")

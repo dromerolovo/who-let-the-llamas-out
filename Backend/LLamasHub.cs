@@ -30,5 +30,13 @@ namespace Backend
 
             await Task.CompletedTask;
         }
+
+        public async Task GetGameStats(int userId)
+        {
+            var llamasCapturedByUser = _appState.Users[userId].CapturedLlamasCount;
+            var totalLlamasCaptured = _appState.Users.Values.Sum(u => u.CapturedLlamasCount);
+            var totalLlamas = _appState.Llamas.Count;
+            await Clients.Caller.SendAsync("OnGameStats", llamasCapturedByUser, totalLlamasCaptured, totalLlamas);
+        }
     }
 }

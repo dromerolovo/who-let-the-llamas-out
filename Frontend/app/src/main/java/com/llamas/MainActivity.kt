@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,7 +27,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -100,6 +103,10 @@ class MainActivity : ComponentActivity() {
 
             val llamasUpdates = signalRViewModel.llamasUpdates.collectAsState()
 
+            var showDialogGameStats by remember { mutableStateOf(false) }
+
+            val gameStats by signalRViewModel.gameStats.collectAsState()
+
             val locationManager : LocationManager = LocationManager(this)
             locationManager.requestLocationPermission()
 
@@ -107,6 +114,15 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(llamasUpdates.value) {
                 Log.d("SignalR", "Received Llamas: ${llamasUpdates.value}")
+            }
+
+            if(showDialogGameStats) {
+                GameStatsDialog(
+                    totalLlamas = gameStats?.totalLlamas ?: 0,
+                    userCapturedLlamas = gameStats?.llamasCapturedByTheUser ?: 0,
+                    totalCapturedLlamas = gameStats?.llamasCaptured ?: 0,
+                    onDismiss = { showDialogGameStats = false }
+                )
             }
 
             LlamasTheme {
@@ -126,7 +142,11 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     DropdownMenuItem(
                                         text = { Text("Game Status") },
-                                        onClick = {  }
+                                        onClick = {
+                                            signalRViewModel.getGameStats(signalRViewModel.userId.value!!)
+                                            showDialogGameStats = true
+                                            menuExpanded = false
+                                        }
 
                                     )
                                 }
@@ -174,7 +194,6 @@ fun MainEntryPoint
     var llamaCaptured by remember { mutableStateOf(false) }
     var llamaIdCaptured by remember { mutableStateOf<Int?>(null)}
 
-    var showDialogGameStats by remember { mutableStateOf(false) }
     val aiResponse by geminiViewModel.aiResponse.collectAsState()
 
     if(showDialog) {
@@ -389,6 +408,50 @@ fun MainEntryPoint
                 true
             }
 
+        }
+    }
+}
+
+
+@Composable
+fun GameStatsDialog(
+    totalLlamas: Int,
+    userCapturedLlamas: Int,
+    totalCapturedLlamas: Int,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 8.dp,
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Game Stats",
+                    style = MaterialTheme.typography.titleLarge
+                )
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.Start,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Total Llamas wandering around: $totalLlamas")
+                    Text("Llamas captured by the user: $userCapturedLlamas")
+                    Text("Total Llamas captured: $totalCapturedLlamas")
+                }
+
+                Button(onClick = onDismiss) {
+                    Text("Close")
+                }
+            }
         }
     }
 }
