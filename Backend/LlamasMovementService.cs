@@ -17,14 +17,17 @@ namespace Backend
         private readonly ConcurrentDictionary<int, Llama> _llamas = new ConcurrentDictionary<int, Llama>();
         private readonly IMapboxDirectionService _mapboxDirectionService;
         private readonly IHubContext<LLamasHub> _hubContext;
+        private readonly AppState _appState = new AppState();
         public LlamasMovementService
         (
             IOptions<LlamasOptions> llamasOptions,
             IMapboxDirectionService mapboxDirectionService,
-            IHubContext<LLamasHub> hubContext
+            IHubContext<LLamasHub> hubContext,
+            AppState appState
 
         )
         {
+            _appState = appState;
             _mapboxDirectionService = mapboxDirectionService;
             _llamasOptions = llamasOptions.Value;
             _hubContext = hubContext;
@@ -63,7 +66,7 @@ namespace Backend
                 MovementPerSecond = v.MovementPerSecond
             }).ToList();
 
-            await _hubContext.Clients.All.SendAsync("LlamasPositions", _llamas.Values.ToList());
+            await _hubContext.Clients.All.SendAsync("LlamasPositions", _llamas.Values.ToList().Where(llm => !llm.Captured));
 
             Console.WriteLine(JsonSerializer.Serialize(dtos));
         }
@@ -76,6 +79,7 @@ namespace Backend
             {
                 var routeTasks = llamasNeedingUpdate.Select(async llm =>
                 {
+                    if (llm.Captured) return;
                     var pointOrigin = llm.PreviousPosition ?? GetRandomPoint();
                     var pointDestination = GetRandomPoint();
                     var newRoute = await _mapboxDirectionService.GetWalkingRoute(pointOrigin, pointDestination);
@@ -92,6 +96,7 @@ namespace Backend
 
             foreach (var llm in _llamas.Values)
             {
+                if(llm.Captured) continue;
                 if (llm.CurrentRoute == null)
                 {
                     llm.NeedsNewRoute = true;

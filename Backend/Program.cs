@@ -6,6 +6,8 @@ builder.Configuration.AddUserSecrets<Program>();
 
 var services = builder.Services;
 
+services.AddSingleton<AppState>();
+
 services.AddSignalR();
 
 services.Configure<LlamasOptions>(builder.Configuration.GetSection("LlamasOptions"));

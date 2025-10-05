@@ -11,6 +11,7 @@
         public SimpleCoordinate? RouteDestination { get; set; }
         public double Bearing { get; set; }
         public SimpleCoordinate? MovementPerSecond { get; set; }
+        public bool Captured { get; set; } = false;
 
         public LlamaDto ToDto()
         {

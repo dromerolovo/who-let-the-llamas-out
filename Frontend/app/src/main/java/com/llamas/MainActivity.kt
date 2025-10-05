@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,10 +38,14 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -162,19 +167,25 @@ fun MainEntryPoint
     var showDialog by remember { mutableStateOf(false) }
     var selectedId by remember { mutableStateOf<Int?>(null)}
 
+    var showDialogGameStats by remember { mutableStateOf(false) }
+
     if(showDialog) {
         Dialog(onDismissRequest = { showDialog = false }) {
             Box(
                 modifier = Modifier
-                    .size(300.dp)
+                    .size(width = 300.dp, height = 500.dp)
                     .background(Color.White, shape = RoundedCornerShape(16.dp))
                     .padding(16.dp)
             ) {
-                Column {
-                    Text("Llama #$selectedId", fontWeight = FontWeight.Bold)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Llama #${selectedId?.plus(1)}", fontWeight = FontWeight.Bold)
+                    Image(painter = painterResource(id = R.drawable.llama_smoking), contentDescription = "Llama")
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("You can design any content here.")
                     Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { signalRViewModel.captureLLama(selectedId!!)}) {
+                        Text("Capture")
+                    }
                     Button(onClick = { showDialog = false }) {
                         Text("Close")
                     }
@@ -314,9 +325,9 @@ fun MainEntryPoint
 
                         layer?.modelCastShadows(true)
 
-                        //This solution is pretty terrible and doesn't fix the shadow problem when
+                        //This solution is not good and doesn't fix the shadow problem when
                         //adding a 3d model to mapbox map. When the geojson of the model is updated the shadow doesn't follow the model
-                        // and if the source or layer gets removed and spawn again a flickering effect is produced. That's why
+                        // and if the source or layer gets removed and spawn again a flickering effect appear. That's why
                         //I'm adding this line, so that every 5 interpolations the shadow is refresh. The flickering effect
                         // is still there but it's much better.
                         if (shadowCounter % 5 == 1) layer?.modelCastShadows(false)
@@ -348,31 +359,5 @@ fun MainEntryPoint
             }
 
         }
-
-
-//        MapEffect { mapView ->
-//            mapView.mapboxMap.addOnMapClickListener { point ->
-//                val screen = mapView.mapboxMap.pixelForCoordinate(point)
-//
-//                val llamaLayers = createdLlamas.map { "llama-layer-1" }
-//
-//                mapView.mapboxMap.queryRenderedFeatures(
-//                    RenderedQueryGeometry(screen),
-//                    RenderedQueryOptions(llamaLayers, null)
-//                ) { result ->
-//                    result.value?.forEach { qf ->
-//                        println("  - ${qf.queriedFeature.sourceLayer}")
-//                    }
-//                    result.value?.firstOrNull().let { feature ->
-//                        val name = feature?.queriedFeature?.feature?.getStringProperty("id")
-//                        val id = feature?.queriedFeature?.feature?.id()
-//                        println(name)
-//                        println(id)
-//                    }
-//                }
-//
-//                true
-//            }
-//        }
     }
 }

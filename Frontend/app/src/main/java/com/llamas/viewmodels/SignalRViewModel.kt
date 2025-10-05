@@ -23,17 +23,32 @@ class SignalRViewModel : ViewModel() {
     private lateinit var hubConnection: HubConnection
     private val SIGNAL_URL = "http://10.0.2.2:5265/llamas-hub"
 
+    private val _userId = MutableStateFlow<Int?>(null)
+    val userId: StateFlow<Int?> = _userId.asStateFlow()
+
     init {
         setupSignalR()
     }
 
+    fun captureLLama(llamaId: Int) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    hubConnection.send("CaptureLlama", llamaId, userId.value)
+                }
+            } catch (e: Exception) {
+            }
+        }
+    }
     private fun setupSignalR() {
         hubConnection = HubConnectionBuilder.create(SIGNAL_URL).build()
 
+        hubConnection.on("OnConnected", { userId ->
+            Log.d("SignalR", "Connected! and user id is: $userId")
+            _isConnected.value = true
+            _userId.value = userId
 
-        hubConnection.on("TestMessage", { message ->
-            Log.d("SignalR", "Received test message: $message")
-        }, String::class.java)
+        }, Int::class.java)
 
         hubConnection.on("LlamasPositions", { llamas ->
             Log.d("SignalR", "Received Llamas: ${llamas.contentToString()}")
@@ -53,6 +68,7 @@ class SignalRViewModel : ViewModel() {
                     hubConnection.start().blockingAwait()
                     _isConnected.value = true
                     Log.d("Connection", "SignalR Connected successfully!")
+                    hubConnection.send("Connect")
                 }
             } catch (e: Exception) {
                 Log.e("Connection", "Connection Failed: ${e.message}")
