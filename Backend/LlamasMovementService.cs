@@ -14,7 +14,6 @@ namespace Backend
     public class LlamasMovementService : BackgroundService
     {
         private readonly LlamasOptions _llamasOptions;
-        private readonly ConcurrentDictionary<int, Llama> _llamas = new ConcurrentDictionary<int, Llama>();
         private readonly IMapboxDirectionService _mapboxDirectionService;
         private readonly IHubContext<LLamasHub> _hubContext;
         private readonly AppState _appState = new AppState();
@@ -52,13 +51,13 @@ namespace Backend
                 {
                     Id = i,
                 };
-                _llamas.TryAdd(i, @object);
+                _appState.Llamas.TryAdd(i, @object);
             }
         }
 
         private async Task BroadcastLlamasPosition()
         {
-            var dtos = _llamas.Values.Select(v => new LlamaDto
+            var dtos = _appState.Llamas.Values.Select(v => new LlamaDto
             {
                 Id = v.Id,
                 CurrentPosition = v.CurrentPosition,
@@ -66,14 +65,14 @@ namespace Backend
                 MovementPerSecond = v.MovementPerSecond
             }).ToList();
 
-            await _hubContext.Clients.All.SendAsync("LlamasPositions", _llamas.Values.ToList().Where(llm => !llm.Captured));
+            await _hubContext.Clients.All.SendAsync("LlamasPositions", _appState.Llamas.Values.ToList().Where(llm => !llm.Captured));
 
             Console.WriteLine(JsonSerializer.Serialize(dtos));
         }
 
         private async Task UpdateLlamasPositions()
         {
-            var llamasNeedingUpdate = _llamas.Values.Where(llm => llm.NeedsNewRoute).ToList();
+            var llamasNeedingUpdate = _appState.Llamas.Values.Where(llm => llm.NeedsNewRoute).ToList();
 
             if(llamasNeedingUpdate.Any())
             {
@@ -94,7 +93,7 @@ namespace Backend
                 await Task.WhenAll(routeTasks);
             }
 
-            foreach (var llm in _llamas.Values)
+            foreach (var llm in _appState.Llamas.Values)
             {
                 if(llm.Captured) continue;
                 if (llm.CurrentRoute == null)

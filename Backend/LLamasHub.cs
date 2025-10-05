@@ -18,7 +18,17 @@ namespace Backend
         }
         public async Task CaptureLlama(int llamaId, int userId)
         {
-            
+            var user = _appState.Users[userId];
+            if(user != null)
+            {
+                var llama = _appState.Llamas[llamaId];
+                llama.Captured = true;
+                user.CapturedLlamasCount++;
+
+                //await Clients.All.SendAsync("OnLlamaCaptured", llamaId, userId);
+            }
+
+            await Task.CompletedTask;
         }
     }
 }

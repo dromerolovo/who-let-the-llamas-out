@@ -167,13 +167,16 @@ fun MainEntryPoint
     var showDialog by remember { mutableStateOf(false) }
     var selectedId by remember { mutableStateOf<Int?>(null)}
 
+    var llamaCaptured by remember { mutableStateOf(false) }
+    var llamaIdCaptured by remember { mutableStateOf<Int?>(null)}
+
     var showDialogGameStats by remember { mutableStateOf(false) }
 
     if(showDialog) {
         Dialog(onDismissRequest = { showDialog = false }) {
             Box(
                 modifier = Modifier
-                    .size(width = 300.dp, height = 500.dp)
+                    .size(width = 300.dp, height = 700.dp)
                     .background(Color.White, shape = RoundedCornerShape(16.dp))
                     .padding(16.dp)
             ) {
@@ -183,8 +186,16 @@ fun MainEntryPoint
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("You can design any content here.")
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { signalRViewModel.captureLLama(selectedId!!)}) {
+                    Button(onClick = {
+                        signalRViewModel.captureLLama(selectedId!!)
+                        llamaCaptured = true
+                        llamaIdCaptured = selectedId
+                        showDialog = false
+                    }) {
                         Text("Capture")
+                    }
+                    Button(onClick = { showDialog = false }) {
+                        Text("Ask for a hint")
                     }
                     Button(onClick = { showDialog = false }) {
                         Text("Close")
@@ -242,6 +253,19 @@ fun MainEntryPoint
             )
         }
     ) {
+
+        MapEffect(llamaCaptured) { mapView ->
+            if (!llamaCaptured) return@MapEffect
+
+            val id = llamaIdCaptured!!
+            val sourceId = "llama-source-$id"
+            val layerId = "llama-layer-$id"
+
+            mapView.mapboxMap.getStyle {style ->
+                style.removeStyleLayer(layerId)
+                style.removeStyleSource(sourceId)
+            }
+        }
 
         MapEffect(Unit) { mapView ->
             mapView.mapboxMap.getStyle { style ->
