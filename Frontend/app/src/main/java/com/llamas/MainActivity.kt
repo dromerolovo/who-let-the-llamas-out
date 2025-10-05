@@ -6,12 +6,20 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,13 +33,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import com.llamas.data.InterpolatedLlama
 import com.llamas.managers.LocationManager
 import com.llamas.ui.theme.LlamasTheme
 import com.llamas.viewmodels.LlamasHandlerViewModel
@@ -40,8 +54,11 @@ import com.llamas.viewmodels.SignalRViewModel
 import com.mapbox.geojson.Feature
 import com.mapbox.geojson.FeatureCollection
 import com.mapbox.geojson.Point
+import com.mapbox.maps.CoordinateBounds
 import com.mapbox.maps.RenderedQueryGeometry
 import com.mapbox.maps.RenderedQueryOptions
+import com.mapbox.maps.ScreenCoordinate
+import com.mapbox.maps.SourceQueryOptions
 import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
@@ -59,6 +76,7 @@ import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource
 import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
 import com.mapbox.maps.extension.style.sources.getSourceAs
 import com.mapbox.maps.plugin.gestures.addOnMapClickListener
+import java.util.Locale.filter
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -135,9 +153,35 @@ fun MainEntryPoint
     val llamasUpdates by signalRViewModel.llamasUpdates.collectAsState()
     val locationUpdate by locationViewModel.userLocation.collectAsState()
 
+    val modelsPixelsPositionState = remember { mutableStateMapOf<Int, ScreenCoordinate>() }
+
     val createdLlamas = remember { mutableStateListOf<Int>() }
 
     var shadowCounter by remember { mutableStateOf(0) }
+
+    var showDialog by remember { mutableStateOf(false) }
+    var selectedId by remember { mutableStateOf<Int?>(null)}
+
+    if(showDialog) {
+        Dialog(onDismissRequest = { showDialog = false }) {
+            Box(
+                modifier = Modifier
+                    .size(300.dp)
+                    .background(Color.White, shape = RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column {
+                    Text("Llama #$selectedId", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("You can design any content here.")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { showDialog = false }) {
+                        Text("Close")
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(llamasUpdates) {
         Log.d("SignalRinMain", "Received ${llamasUpdates.size} updates")
@@ -169,6 +213,7 @@ fun MainEntryPoint
         }
     }
 
+
     MapboxMap(
         Modifier.fillMaxSize().padding(innerPadding),
         mapViewportState = mapViewportState,
@@ -186,34 +231,6 @@ fun MainEntryPoint
             )
         }
     ) {
-
-//        MapEffect(createdLlamas.toList()) { mapView ->
-//            mapView.mapboxMap.addOnMapClickListener { point ->
-//
-//                val screen = mapView.mapboxMap.pixelForCoordinate(point)
-//
-//                mapView.mapboxMap.queryRenderedFeatures(
-//                    RenderedQueryGeometry(screen),
-//                    RenderedQueryOptions(listOf("model-layer"), null)
-//                ) { expected ->
-//                    expected.value?.let { renderedQueryResults ->
-//                        renderedQueryResults.firstOrNull()?.let { renderedResult ->
-//                            val feature = renderedResult.feature
-//                            val id = feature.getStringProperty("id")
-//                            val name = feature.getStringProperty("name")
-//
-//                            Toast.makeText(context, "Clicked model: $name (id: $id)", Toast.LENGTH_SHORT).show()
-//                        }
-//                    }
-//
-//                    expected.error?.let { error ->
-//                        Log.e("Mapbox", "Query error: ${error.message}")
-//                    }
-//                }
-//
-//                true
-//            }
-//        }
 
         MapEffect(Unit) { mapView ->
             mapView.mapboxMap.getStyle { style ->
@@ -253,6 +270,7 @@ fun MainEntryPoint
                                 modelTranslation(listOf(0.0, 0.0, 0.0))
                             }
                         )
+
 
                         createdLlamas.add(id)
                         Log.d("MapUpdate", "Created llama with ID: $id")
@@ -306,5 +324,55 @@ fun MainEntryPoint
                 }
             }
         }
+
+        MapEffect(interpolatedLlamas) { mapView ->
+            interpolatedLlamas.forEach { (id, llm) ->
+                val screenPoint = mapView.mapboxMap.pixelForCoordinate(Point.fromLngLat(llm.currentPosition.x, llm.currentPosition.y))
+                modelsPixelsPositionState[id] = screenPoint
+            }
+
+        }
+
+        MapEffect { mapView ->
+            mapView.mapboxMap.addOnMapClickListener { point ->
+                val screen = mapView.mapboxMap.pixelForCoordinate(point)
+                Log.d("MapClick", "Screen: $screen")
+                modelsPixelsPositionState.forEach { (id, screenPoint) ->
+                    if(screen.x >= screenPoint.x - 50 && screen.x <= screenPoint.x + 50 && screen.y >= screenPoint.y - 50 && screen.y <= screenPoint.y + 50) {
+                        showDialog = true
+                        selectedId = id
+                        Log.d("MapClick", "Selected llama with ID: $id")
+                    }
+                }
+                true
+            }
+
+        }
+
+
+//        MapEffect { mapView ->
+//            mapView.mapboxMap.addOnMapClickListener { point ->
+//                val screen = mapView.mapboxMap.pixelForCoordinate(point)
+//
+//                val llamaLayers = createdLlamas.map { "llama-layer-1" }
+//
+//                mapView.mapboxMap.queryRenderedFeatures(
+//                    RenderedQueryGeometry(screen),
+//                    RenderedQueryOptions(llamaLayers, null)
+//                ) { result ->
+//                    result.value?.forEach { qf ->
+//                        println("  - ${qf.queriedFeature.sourceLayer}")
+//                    }
+//                    result.value?.firstOrNull().let { feature ->
+//                        val name = feature?.queriedFeature?.feature?.getStringProperty("id")
+//                        val id = feature?.queriedFeature?.feature?.id()
+//                        println(name)
+//                        println(id)
+//                    }
+//                }
+//
+//                true
+//            }
+//        }
     }
 }
